@@ -1,6 +1,11 @@
-"""AI 文档批量生成工具 —— 入口"""
+"""AI 文档批量生成工具 - 程序入口"""
 
-from ui import MainWindow
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from ui.main_window import MainWindow
 
 
 def main():
