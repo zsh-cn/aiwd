@@ -1,5 +1,3 @@
-"""Prompt 模板集中管理"""
-
 TITLE_GENERATION_PROMPT = """你是一位专业内容创作者。请围绕主题"{theme}"，生成{count}个文章标题。
 要求：标题简洁有吸引力，不重复，覆盖不同子角度。
 额外要求：{remark}

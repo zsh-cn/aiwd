@@ -1,5 +1,3 @@
-"""标题生成逻辑"""
-
 import re
 
 from api_client import APIClient
@@ -7,7 +5,6 @@ from utils.prompt_templates import build_title_prompt
 
 
 class TitleGenerator:
-    """标题生成器"""
 
     def __init__(self, client: APIClient):
         self.client = client
@@ -22,7 +19,6 @@ class TitleGenerator:
         item_callback=None,
         stop_event=None,
     ) -> list:
-        """流式生成标题列表，实时更新进度"""
         prompt = build_title_prompt(theme, count, remark)
         messages = [
             {

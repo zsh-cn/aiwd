@@ -1,5 +1,3 @@
-"""OpenAI 兼容 API 封装"""
-
 import json
 import threading
 import httpx
@@ -7,7 +5,6 @@ import time
 
 
 class APIError(Exception):
-    """API 调用异常"""
 
     def __init__(self, message: str, status_code: int = 0):
         super().__init__(message)
@@ -15,7 +12,6 @@ class APIError(Exception):
 
 
 class APIClient:
-    """OpenAI 兼容格式 API 客户端"""
 
     def __init__(self, base_url: str, api_key: str, model: str, timeout: float = 120.0):
         self.base_url = base_url.rstrip("/")
@@ -42,7 +38,6 @@ class APIClient:
         }
 
     def list_models(self) -> list:
-        """获取可用模型列表"""
         try:
             url = self._build_url("models")
             resp = self._client.get(url, headers=self._headers(), timeout=15.0)
@@ -68,7 +63,6 @@ class APIClient:
             raise APIError(f"获取模型列表失败: {str(e)}")
 
     def test_connection(self) -> bool:
-        """测试 API 连接"""
         try:
             url = self._build_url("models")
             resp = self._client.get(url, headers=self._headers(), timeout=15.0)
@@ -98,7 +92,6 @@ class APIClient:
         max_retries: int = 3,
         stop_event=None,
     ) -> str:
-        """调用 chat/completions 接口，返回文本内容"""
         url = self._build_url("chat/completions")
         payload = {
             "model": model or self.model,
@@ -148,7 +141,6 @@ class APIClient:
         raise APIError(f"请求失败（已重试 {max_retries} 次）: {last_error}")
 
     def close(self):
-        """关闭 HTTP 客户端"""
         self._closed = True
         try:
             self._client.close()
@@ -164,7 +156,6 @@ class APIClient:
         max_retries: int = 3,
         stop_event=None,
     ):
-        """流式调用 chat/completions 接口，逐步 yield 文本内容"""
         url = self._build_url("chat/completions")
         payload = {
             "model": model or self.model,

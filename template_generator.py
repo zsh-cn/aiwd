@@ -1,26 +1,3 @@
-"""Reference-doc 模板生成器 - 使用 python-docx 根据排版配置动态生成 Word 模板
-
-支持的排版属性：
-- 字体: name/size/color/bold/italic/strike/underline/superscript/subscript/
-         character_spacing/shadow/outline/emboss/imprint/glow
-- 段落: alignment/space_before/space_after/line_spacing/first_line_indent/
-         left_indent/right_indent/tab_stops/page_break_before/page_break_after
-- 页面: margin_top/bottom/left/right, paper_size, orientation, columns,
-        page_border_color/width, background_color
-- 表格: border/border_color/border_width/row_height/cell_margin_*,
-        cell_shading
-- 代码块: background_color/font/size/color
-- 行内代码: font/size/color/background_color
-- 分割线: color/width/space_before/after
-- 任务列表: font/size/color/line_spacing/space_before/after
-- 定义列表: term_font/size/color/bold, definition_font/size/color/italic, left_indent
-- 图片: alignment/caption_*
-- 页眉页脚: text/font/size/color/alignment/page_number
-- 脚注尾注: font/size/color
-- H5/H6 标题: 完整样式
-- 嵌套列表: List Bullet 2/3, List Number 2/3
-"""
-
 import os
 import tempfile
 
@@ -37,16 +14,6 @@ _PAPER_SIZES = {
 
 
 def generate_reference_doc(layout_config: dict, output_path: str = None) -> str:
-    """
-    根据排版配置生成 Word reference-doc 模板
-
-    Args:
-        layout_config: 排版配置字典
-        output_path: 输出路径，为 None 时使用临时文件
-
-    Returns:
-        生成的模板文件路径
-    """
     try:
         from docx import Document
         from docx.shared import Pt, Cm, RGBColor
@@ -92,10 +59,7 @@ def generate_reference_doc(layout_config: dict, output_path: str = None) -> str:
     return output_path
 
 
-# ========== 页面设置 ==========
-
 def _setup_page(doc, page_config: dict, Cm, WD_ORIENT, qn):
-    """设置页面边距、纸张大小、方向、分栏、页面边框、背景色"""
     for section in doc.sections:
         section.top_margin = Cm(page_config.get("margin_top", 2.54))
         section.bottom_margin = Cm(page_config.get("margin_bottom", 2.54))
@@ -133,7 +97,6 @@ def _setup_page(doc, page_config: dict, Cm, WD_ORIENT, qn):
 
 
 def _apply_columns(section, num_columns: int, qn):
-    """通过 XML 设置分栏"""
     sectPr = section._sectPr
     cols = sectPr.find(qn('w:cols'))
     if cols is None:
@@ -144,7 +107,6 @@ def _apply_columns(section, num_columns: int, qn):
 
 
 def _apply_page_border(section, color: str, width_pt: float, qn):
-    """设置页面边框"""
     from lxml import etree
     sectPr = section._sectPr
     for existing in sectPr.findall(qn('w:pgBorders')):
@@ -160,7 +122,6 @@ def _apply_page_border(section, color: str, width_pt: float, qn):
 
 
 def _apply_page_background(section, color: str, qn):
-    """设置页面背景色"""
     from lxml import etree
     sectPr = section._sectPr
     for existing in sectPr.findall(qn('w:background')):
@@ -169,14 +130,11 @@ def _apply_page_background(section, color: str, qn):
     bg.set(qn('w:color'), color.lstrip('#'))
 
 
-# ========== 字体属性 ==========
-
 def _set_font(run_or_style, Pt, RGBColor, qn,
               font_name=None, size=None, color=None,
               bold=None, italic=None, strike=None, underline=None,
               superscript=None, subscript=None, character_spacing=None,
               shadow=None, outline=None, emboss=None, imprint=None, glow=None):
-    """设置完整字体属性（含字符效果）"""
     if font_name:
         run_or_style.font.name = font_name
         try:
@@ -220,7 +178,6 @@ def _set_font(run_or_style, Pt, RGBColor, qn,
 
 
 def _set_character_spacing(style, spacing_pt: float, qn):
-    """设置字符间距 (磅 → twips)"""
     try:
         rPr = style._element.get_or_add_rPr()
         for existing in rPr.findall(qn('w:spacing')):
@@ -233,7 +190,6 @@ def _set_character_spacing(style, spacing_pt: float, qn):
 
 
 def _set_bool_prop(parent, qn, tag: str, value: bool):
-    """设置布尔型 XML 属性（存在即 true，移除即 false）"""
     from lxml import etree
     for existing in parent.findall(qn(tag)):
         parent.remove(existing)
@@ -242,10 +198,7 @@ def _set_bool_prop(parent, qn, tag: str, value: bool):
         elem.set(qn('w:val'), '1')
 
 
-# ========== 段落格式 ==========
-
 def _set_paragraph_format(paragraph_format, config: dict, Pt, WD_ALIGN_PARAGRAPH):
-    """设置完整段落格式"""
     if "alignment" in config:
         align_map = {
             "left": WD_ALIGN_PARAGRAPH.LEFT,
@@ -277,7 +230,6 @@ def _set_paragraph_format(paragraph_format, config: dict, Pt, WD_ALIGN_PARAGRAPH
 
 
 def _set_tab_stops(paragraph_format, tab_stops: list, Pt, WD_ALIGN_PARAGRAPH):
-    """设置制表位"""
     align_map = {
         "left": WD_ALIGN_PARAGRAPH.LEFT,
         "center": WD_ALIGN_PARAGRAPH.CENTER,
@@ -290,10 +242,7 @@ def _set_tab_stops(paragraph_format, tab_stops: list, Pt, WD_ALIGN_PARAGRAPH):
             paragraph_format.tab_stops.add_tab_stop(position, alignment)
 
 
-# ========== 样式配置 ==========
-
 def _get_or_create_style(doc, name, style_type):
-    """安全获取或创建样式"""
     try:
         return doc.styles[name]
     except KeyError:
@@ -305,7 +254,6 @@ def _get_or_create_style(doc, name, style_type):
 
 
 def _apply_font_config(style, config: dict, Pt, RGBColor, qn):
-    """将字体配置应用到样式"""
     font_name = config.get("font", config.get("name"))
     _set_font(
         style, Pt, RGBColor, qn,
@@ -328,12 +276,10 @@ def _apply_font_config(style, config: dict, Pt, RGBColor, qn):
 
 
 def _apply_para_config(style, config: dict, Pt, WD_ALIGN_PARAGRAPH):
-    """将段落配置应用到样式"""
     _set_paragraph_format(style.paragraph_format, config, Pt, WD_ALIGN_PARAGRAPH)
 
 
 def _configure_default_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH):
-    """配置默认(正文)样式"""
     default_config = styles_config.get("default_font", {})
     body_config = styles_config.get("body", {})
 
@@ -346,7 +292,6 @@ def _configure_default_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARA
 
 
 def _configure_title_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
-    """配置标题样式"""
     title_config = styles_config.get("title", {})
     if not title_config:
         return
@@ -357,7 +302,6 @@ def _configure_title_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGR
 
 
 def _configure_heading_styles(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
-    """配置标题层级样式 H1~H6"""
     heading_map = {
         'h1': 'Heading 1',
         'h2': 'Heading 2',
@@ -379,7 +323,6 @@ def _configure_heading_styles(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PAR
 
 
 def _configure_body_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH):
-    """配置正文样式"""
     body_config = styles_config.get("body", {})
     if not body_config:
         return
@@ -391,7 +334,6 @@ def _configure_body_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRA
 
 
 def _configure_quote_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
-    """配置引用样式"""
     quote_config = styles_config.get("quote", {})
     if not quote_config:
         return
@@ -403,7 +345,6 @@ def _configure_quote_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGR
 
 
 def _configure_list_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
-    """配置列表样式（含嵌套层级）"""
     base_list_config = styles_config.get("list", {})
     nested_config = styles_config.get("nested_list", {})
 
@@ -428,7 +369,6 @@ def _configure_list_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRA
 
 
 def _configure_code_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE, OxmlElement):
-    """配置代码块样式"""
     code_config = styles_config.get("code", {})
     if not code_config:
         return
@@ -443,7 +383,6 @@ def _configure_code_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRA
 
 
 def _configure_inline_code_style(doc, styles_config, Pt, RGBColor, qn, WD_STYLE_TYPE, OxmlElement):
-    """配置行内代码样式 (Source Code)"""
     inline_code_config = styles_config.get("inline_code", {})
     if not inline_code_config:
         return
@@ -457,7 +396,6 @@ def _configure_inline_code_style(doc, styles_config, Pt, RGBColor, qn, WD_STYLE_
 
 
 def _configure_hr_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE, OxmlElement):
-    """配置分割线样式"""
     hr_config = styles_config.get("hr", {})
     if not hr_config:
         return
@@ -475,7 +413,6 @@ def _configure_hr_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH
 
 
 def _configure_task_list_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
-    """配置任务列表样式"""
     task_config = styles_config.get("task_list", {})
     if not task_config:
         return
@@ -487,7 +424,6 @@ def _configure_task_list_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PA
 
 
 def _configure_definition_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
-    """配置定义列表样式 (Definition Term + Definition)"""
     def_config = styles_config.get("definition", {})
     if not def_config:
         return
@@ -522,7 +458,6 @@ def _configure_definition_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_P
 
 
 def _configure_table_style(doc, styles_config, Pt, Cm, RGBColor, qn, WD_STYLE_TYPE, OxmlElement):
-    """配置表格样式（含单元格着色）"""
     table_config = styles_config.get("table", {})
     if not table_config:
         return
@@ -558,7 +493,6 @@ def _configure_table_style(doc, styles_config, Pt, Cm, RGBColor, qn, WD_STYLE_TY
 
 
 def _configure_link_style(doc, styles_config, Pt, RGBColor, qn, WD_STYLE_TYPE):
-    """配置超链接样式"""
     link_config = styles_config.get("link", {})
     if not link_config:
         return
@@ -568,7 +502,6 @@ def _configure_link_style(doc, styles_config, Pt, RGBColor, qn, WD_STYLE_TYPE):
 
 
 def _configure_image_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
-    """配置图片样式"""
     image_config = styles_config.get("image", {})
     if not image_config:
         return
@@ -593,7 +526,6 @@ def _configure_image_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGR
 
 
 def _configure_footnotes_style(doc, config, Pt, RGBColor, qn, WD_STYLE_TYPE, OxmlElement):
-    """配置脚注样式"""
     if not config:
         return
     try:
@@ -604,7 +536,6 @@ def _configure_footnotes_style(doc, config, Pt, RGBColor, qn, WD_STYLE_TYPE, Oxm
 
 
 def _configure_endnotes_style(doc, config, Pt, RGBColor, qn, WD_STYLE_TYPE, OxmlElement):
-    """配置尾注样式"""
     if not config:
         return
     try:
@@ -614,10 +545,7 @@ def _configure_endnotes_style(doc, config, Pt, RGBColor, qn, WD_STYLE_TYPE, Oxml
     _apply_font_config(style, config, Pt, RGBColor, qn)
 
 
-# ========== 页眉页脚 ==========
-
 def _setup_headers_footers(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, OxmlElement):
-    """设置页眉和页脚"""
     header_config = styles_config.get("header", {})
     footer_config = styles_config.get("footer", {})
 
@@ -630,7 +558,6 @@ def _setup_headers_footers(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGR
 
 
 def _setup_header(section, config: dict, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH):
-    """设置页眉"""
     header = section.header
     if header.paragraphs:
         para = header.paragraphs[0]
@@ -665,7 +592,6 @@ def _setup_header(section, config: dict, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH):
 
 
 def _setup_footer(section, config: dict, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, OxmlElement):
-    """设置页脚（含页码）"""
     footer = section.footer
     if footer.paragraphs:
         para = footer.paragraphs[0]
@@ -713,7 +639,6 @@ def _setup_footer(section, config: dict, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, O
 
 
 def _add_page_number_field(para, font_name, font_size, font_color, Pt, RGBColor, qn, OxmlElement):
-    """在段落中插入 PAGE 域代码"""
     run1 = para.add_run()
     run1.font.name = font_name
     try:
@@ -779,10 +704,7 @@ def _add_page_number_field(para, font_name, font_size, font_color, Pt, RGBColor,
     run5._element.append(fldChar_end)
 
 
-# ========== 表格底层操作 ==========
-
 def _set_table_borders(style, color: str, width: float, qn, OxmlElement):
-    """设置表格边框"""
     tbl = style.element
     tblPr = tbl.find(qn('w:tblPr'))
     if tblPr is None:
@@ -807,7 +729,6 @@ def _set_table_borders(style, color: str, width: float, qn, OxmlElement):
 
 
 def _remove_table_borders(style, qn, OxmlElement):
-    """移除表格边框"""
     tbl = style.element
     tblPr = tbl.find(qn('w:tblPr'))
     if tblPr is None:
@@ -829,7 +750,6 @@ def _remove_table_borders(style, qn, OxmlElement):
 
 
 def _set_table_row_height(style, height_cm: float, Cm, qn, OxmlElement):
-    """设置表格行高"""
     tbl = style.element
     tblPr = tbl.find(qn('w:tblPr'))
     if tblPr is None:
@@ -848,7 +768,6 @@ def _set_table_row_height(style, height_cm: float, Cm, qn, OxmlElement):
 
 
 def _set_table_cell_margins(style, table_config: dict, Cm, qn, OxmlElement):
-    """设置表格单元格内边距"""
     tbl = style.element
     tblPr = tbl.find(qn('w:tblPr'))
     if tblPr is None:
@@ -871,10 +790,7 @@ def _set_table_cell_margins(style, table_config: dict, Cm, qn, OxmlElement):
     tblPr.append(tblCellMar)
 
 
-# ========== 样式底层操作 ==========
-
 def _set_style_shading(style, color: str, qn, OxmlElement):
-    """设置样式底纹（用于代码块背景色等）"""
     try:
         pPr = style.element.get_or_add_pPr()
         for existing in pPr.findall(qn('w:shd')):
@@ -890,7 +806,6 @@ def _set_style_shading(style, color: str, qn, OxmlElement):
 
 
 def _set_paragraph_bottom_border(style, color: str, width_pt: float, qn, OxmlElement):
-    """设置段落底部边框（用于分割线等）"""
     try:
         pPr = style.element.get_or_add_pPr()
         for existing in pPr.findall(qn('w:pBdr')):

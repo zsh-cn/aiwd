@@ -1,70 +1,10 @@
-"""AI 排版分析器 - 分析文档内容结构，生成排版配置"""
-
 import json
 import re
 
 from api_client import APIClient, APIError
 
 
-# AI 输出的排版配置 JSON Schema 说明
-# {
-#   "styles": {
-#     "default_font": {"name": "宋体", "size": 11, "color": "#000000",
-#                      "italic": false, "strike": false, "superscript": false,
-#                      "subscript": false, "character_spacing": 0,
-#                      "shadow": false, "outline": false,
-#                      "emboss": false, "imprint": false, "glow": false},
-#     "title": {"font": "黑体", "size": 22, "color": "#1a1a1a", "bold": true,
-#               "alignment": "center", "space_before": 24, "space_after": 18,
-#               "page_break_before": false, "page_break_after": false},
-#     "h1" ~ "h6": {...},
-#     "body": {"font": "宋体", "size": 11, "color": "#000000",
-#              "line_spacing": 1.5, "first_line_indent": 22,
-#              "tab_stops": []},
-#     "quote": {...},
-#     "list": {...},
-#     "nested_list": {"level2": {...}, "level3": {...}},
-#     "code": {"font": "Consolas", "size": 10, "color": "#2d3748",
-#              "background_color": "#f7fafc", "left_indent": 20},
-#     "inline_code": {"font": "Consolas", "size": 10, "color": "#2d3748",
-#                     "background_color": "#f0f0f0"},
-#     "hr": {"color": "#999999", "width": 1.0,
-#            "space_before": 12, "space_after": 12},
-#     "task_list": {"font": "宋体", "size": 11, "color": "#000000",
-#                   "line_spacing": 1.4, "space_before": 3, "space_after": 3},
-#     "definition": {"term_font": "黑体", "term_size": 11, "term_color": "#1a202c",
-#                    "definition_font": "宋体", "definition_size": 11, "definition_color": "#000000",
-#                    "left_indent": 44},
-#     "table": {"font": "宋体", "size": 10, "color": "#000000",
-#               "border": true, "border_color": "#000000", "border_width": 0.5,
-#               "row_height": 0.8,
-#               "cell_margin_top": 0.1, "cell_margin_bottom": 0.1,
-#               "cell_margin_left": 0.1, "cell_margin_right": 0.1,
-#               "cell_shading": "#f5f5f5"},
-#     "link": {"font": "宋体", "size": 11, "color": "#3182ce", "underline": true},
-#     "image": {"alignment": "center",
-#               "caption_font": "宋体", "caption_size": 9, "caption_color": "#666666"},
-#     "header": {"text": "", "font": "宋体", "size": 9, "color": "#666666",
-#                "alignment": "center"},
-#     "footer": {"text": "", "font": "宋体", "size": 9, "color": "#666666",
-#                "alignment": "center", "page_number": true}
-#   },
-#   "page": {
-#     "margin_top": 2.54, "margin_bottom": 2.54,
-#     "margin_left": 3.18, "margin_right": 3.18,
-#     "paper_size": "A4", "orientation": "portrait",
-#     "columns": 1,
-#     "page_border_color": "#000000", "page_border_width": 1.0,
-#     "background_color": "#ffffff"
-#   },
-#   "footnotes": {"font": "宋体", "size": 9, "color": "#333333"},
-#   "endnotes": {"font": "宋体", "size": 9, "color": "#333333"},
-#   "pandoc_extra_args": [...]
-# }
-
-
 def _extract_json(content: str) -> dict:
-    """从 AI 响应中提取 JSON 配置"""
     json_pattern = r'\{[\s\S]*\}'
     match = re.search(json_pattern, content)
     if match:
@@ -84,7 +24,6 @@ def _extract_json(content: str) -> dict:
 
 
 def _normalize_config(config: dict) -> dict:
-    """将 AI 返回的配置规范化为标准格式，填充默认值"""
     defaults = {
         "styles": {
             "default_font": {
@@ -231,8 +170,7 @@ def _normalize_config(config: dict) -> dict:
             "table": {
                 "font": "宋体", "size": 10, "color": "#000000",
                 "italic": False, "strike": False,
-                "border": True, "border_color": "#000000",
-                "border_width": 0.5,
+                "border": True, "border_color": "#000000", "border_width": 0.5,
                 "row_height": 0.8,
                 "cell_margin_top": 0.1, "cell_margin_bottom": 0.1,
                 "cell_margin_left": 0.1, "cell_margin_right": 0.1,
@@ -303,20 +241,6 @@ def analyze_and_generate_layout(
     remark: str = "",
     stop_event=None,
 ) -> dict:
-    """
-    分析 Markdown 文档内容结构，生成排版配置
-
-    Args:
-        client: API 客户端
-        markdown_content: Markdown 格式的文档内容
-        title: 文档标题
-        theme: 主题
-        remark: 备注/额外要求（同时适用于 AI 排版分析）
-        stop_event: 停止事件
-
-    Returns:
-        排版配置字典
-    """
     structure = _analyze_structure(markdown_content)
 
     prompt = _build_layout_prompt(title, theme, remark, structure, markdown_content)
@@ -432,7 +356,6 @@ def analyze_and_generate_layout(
 
 
 def _analyze_structure(markdown: str) -> dict:
-    """分析 Markdown 文档的结构"""
     structure = {
         "has_title": False,
         "has_h1": False,
@@ -506,7 +429,6 @@ def _analyze_structure(markdown: str) -> dict:
 def _build_layout_prompt(
     title: str, theme: str, remark: str, structure: dict, markdown: str
 ) -> str:
-    """构建排版分析的 prompt"""
     remark_text = remark if remark.strip() else "无"
 
     structure_desc = []

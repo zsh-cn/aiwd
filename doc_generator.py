@@ -1,5 +1,3 @@
-"""文档批量生成（含线程管理和 AI 排版）"""
-
 import os
 import tempfile
 import threading
@@ -13,7 +11,6 @@ from utils.file_utils import sanitize_filename, ensure_dir
 
 
 class DocGenerator:
-    """文档批量生成器"""
 
     def __init__(
         self,
@@ -78,7 +75,6 @@ class DocGenerator:
         return 0
 
     def _generate_single(self, title: str, doc_index: int = 0, total_docs: int = 0) -> tuple:
-        """生成单个文档，返回 (title, success, markdown_content_or_error)"""
         if self.is_stopped():
             return (title, False, "用户停止")
 
@@ -125,7 +121,6 @@ class DocGenerator:
 
     def _generate_layout_and_template(self, title: str, markdown: str, idx: int = 0, total: int = 0,
                                         progress_doc_index: int = 0, progress_total: int = 0) -> tuple:
-        """分析文档内容并生成排版模板，返回 (模板文件路径, 排版配置)"""
         try:
             self._update_status(f'正在分析 "{title}" 的内容结构...{idx}/{total}')
             if progress_total > 0:
@@ -158,7 +153,6 @@ class DocGenerator:
 
     def _save_and_convert(self, title: str, markdown: str, reference_doc: str = None,
                           layout_config: dict = None) -> str:
-        """保存 Markdown 并转换为 Docx，返回最终 docx 路径"""
         ensure_dir(self.output_dir)
         safe_name = sanitize_filename(title)
         md_path = os.path.join(self.output_dir, safe_name + ".md")
@@ -185,7 +179,6 @@ class DocGenerator:
         return docx_path
 
     def run(self, callback=None):
-        """在后台线程中运行生成任务"""
         thread = threading.Thread(target=self._run, daemon=True)
         thread.start()
         return thread

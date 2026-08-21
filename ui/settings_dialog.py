@@ -1,5 +1,3 @@
-"""设置对话框"""
-
 import tkinter as tk
 from tkinter import ttk
 import threading
@@ -8,7 +6,6 @@ from api_client import APIClient, APIError
 
 
 class SettingsDialog(tk.Toplevel):
-    """API 配置对话框"""
 
     def __init__(self, master, config, on_save_callback=None):
         super().__init__(master)

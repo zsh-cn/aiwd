@@ -1,5 +1,3 @@
-"""AI 文档批量生成工具 - 程序入口"""
-
 import sys
 import os
 

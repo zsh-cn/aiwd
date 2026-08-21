@@ -1,5 +1,3 @@
-"""配置读写与加密"""
-
 import json
 import os
 import base64
@@ -15,7 +13,6 @@ def _get_config_path() -> str:
 
 
 def _simple_encrypt(text: str, key: int = 42) -> str:
-    """简单 XOR + Base64 加密"""
     if not text:
         return ""
     result = bytes([ord(c) ^ key for c in text])
@@ -23,7 +20,6 @@ def _simple_encrypt(text: str, key: int = 42) -> str:
 
 
 def _simple_decrypt(encoded: str, key: int = 42) -> str:
-    """简单 XOR + Base64 解密"""
     if not encoded:
         return ""
     try:
@@ -34,7 +30,6 @@ def _simple_decrypt(encoded: str, key: int = 42) -> str:
 
 
 class Config:
-    """应用配置管理"""
 
     def __init__(self):
         self._path = _get_config_path()
@@ -133,7 +128,6 @@ class Config:
         self._data["template_doc"] = value
 
     def load(self):
-        """从文件加载配置"""
         try:
             if os.path.exists(self._path):
                 with open(self._path, "r", encoding="utf-8") as f:
@@ -143,7 +137,6 @@ class Config:
             pass
 
     def save(self):
-        """保存配置到文件"""
         try:
             with open(self._path, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, ensure_ascii=False, indent=2)
@@ -151,5 +144,4 @@ class Config:
             pass
 
     def is_configured(self) -> bool:
-        """检查是否已配置 API"""
         return bool(self.base_url and self.api_key and self.model)

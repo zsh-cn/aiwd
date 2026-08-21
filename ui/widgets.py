@@ -1,11 +1,8 @@
-"""自定义控件"""
-
 import tkinter as tk
 from tkinter import ttk
 
 
 class EditableListbox(tk.Frame):
-    """可编辑的标题列表控件（基于原生 Listbox，使用 Windows 系统样式）"""
 
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
