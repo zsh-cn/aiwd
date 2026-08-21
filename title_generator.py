@@ -1,5 +1,7 @@
 """标题生成逻辑"""
 
+import re
+
 from api_client import APIClient
 from utils.prompt_templates import build_title_prompt
 
@@ -47,23 +49,24 @@ class TitleGenerator:
             while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
                 line = line.strip()
-                line = line.lstrip("0123456789.、-•· ")
+                line = re.sub(r'^\d+[\.、\-•·]\s*', '', line)
                 if line:
                     titles.append(line)
                     if item_callback:
                         item_callback(line)
                     if progress_callback:
-                        progress_callback(len(titles), count)
+                        progress_callback(min(len(titles), count), count)
                     if status_callback:
                         status_callback(f"已生成 {len(titles)}/{count} 个标题")
 
         if buffer.strip() and not (stop_event and stop_event.is_set()):
-            line = buffer.strip().lstrip("0123456789.、-•· ")
+            line = buffer.strip()
+            line = re.sub(r'^\d+[\.、\-•·]\s*', '', line)
             if line:
                 titles.append(line)
                 if item_callback:
                     item_callback(line)
                 if progress_callback:
-                    progress_callback(len(titles), count)
+                    progress_callback(min(len(titles), count), count)
 
         return titles[:count]

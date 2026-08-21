@@ -10,7 +10,7 @@ def _get_config_path() -> str:
     if getattr(sys, "frozen", False):
         base_dir = os.path.dirname(sys.executable)
     else:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        base_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_dir, "config.json")
 
 
@@ -47,6 +47,8 @@ class Config:
             "remark": "",
             "count": 10,
             "word_count": 1000,
+            "ai_formatting": True,
+            "template_doc": "",
         }
         self.load()
 
@@ -113,6 +115,22 @@ class Config:
     @word_count.setter
     def word_count(self, value: int):
         self._data["word_count"] = max(0, value)
+
+    @property
+    def ai_formatting(self) -> bool:
+        return self._data.get("ai_formatting", True)
+
+    @ai_formatting.setter
+    def ai_formatting(self, value: bool):
+        self._data["ai_formatting"] = bool(value)
+
+    @property
+    def template_doc(self) -> str:
+        return self._data.get("template_doc", "")
+
+    @template_doc.setter
+    def template_doc(self, value: str):
+        self._data["template_doc"] = value
 
     def load(self):
         """从文件加载配置"""

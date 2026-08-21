@@ -91,6 +91,10 @@ class MainWindow:
             wrap="word",
         )
         self.remark_text.grid(row=1, column=1, columnspan=3, sticky=tk.EW, padx=5, pady=(0, 6))
+        self.remark_text.bind("<Button-1>", self._on_remark_mouse)
+        self.remark_text.bind("<Double-Button-1>", self._on_remark_mouse)
+        self.remark_text.bind("<B1-Motion>", self._on_remark_mouse)
+        self.remark_text.bind("<MouseWheel>", self._on_remark_mouse)
 
         ttk.Label(frame, text="生成数量:", font=("Microsoft YaHei UI", 10)).grid(
             row=2, column=0, sticky=tk.W, padx=(0, 5)
@@ -147,7 +151,7 @@ class MainWindow:
             text="生成标题列表",
             command=self._generate_titles,
         )
-        self.generate_titles_btn.grid(row=4, column=0, columnspan=4, pady=(12, 0))
+        self.generate_titles_btn.grid(row=4, column=0, columnspan=4, pady=(8, 0))
 
         frame.columnconfigure(1, weight=1)
         frame.columnconfigure(3, weight=0)
@@ -240,12 +244,17 @@ class MainWindow:
         )
         self.open_output_btn.pack(side=tk.LEFT)
 
-    def _set_ui_state(self, running: bool):
+    def _on_remark_mouse(self, event):
+        if self.remark_text.cget("state") == tk.DISABLED:
+            return "break"
+        return None
+
+    def _set_ui_state(self, running: bool, disable_listbox: bool = True):
         state = tk.DISABLED if running else tk.NORMAL
         self.theme_entry.configure(state=state)
         self.remark_text.configure(state=state)
         if running:
-            self.remark_text.configure(bg="#F0F0F0")
+            self.remark_text.configure(bg="#E8E8E8")
         else:
             self.remark_text.configure(bg="white")
         self.count_spin.configure(state=state)
@@ -255,7 +264,7 @@ class MainWindow:
         self.generate_titles_btn.configure(state=state)
         self.start_btn.configure(state=tk.DISABLED if running else tk.NORMAL)
         self.stop_btn.configure(state=tk.NORMAL if running else tk.DISABLED)
-        self.title_listbox.set_enabled(not running)
+        self.title_listbox.set_enabled(not running, buttons_only=running and not disable_listbox)
 
     def _load_config(self):
         self.output_dir_var.set(self.config.output_dir)
@@ -307,7 +316,7 @@ class MainWindow:
 
         self._title_generating = True
         self._stop_title_event.clear()
-        self._set_ui_state(True)
+        self._set_ui_state(True, disable_listbox=False)
         self.progress_var.set(0)
         self.progress_bar.config(mode="determinate", maximum=100)
         self.status_label.config(text="正在生成标题列表...")
@@ -386,6 +395,10 @@ class MainWindow:
         self._set_ui_state(True)
         self.progress_var.set(0)
 
+        if self._doc_generator and self._doc_generator.client:
+            self._doc_generator.client.close()
+            self._doc_generator = None
+
         client = APIClient(self.config.base_url, self.config.api_key, self.config.model)
         self._doc_generator = DocGenerator(
             client=client,
@@ -394,6 +407,8 @@ class MainWindow:
             remark=remark,
             output_dir=output_dir,
             word_count=self.word_count_var.get(),
+            ai_formatting=self.config.ai_formatting,
+            template_doc=self.config.template_doc,
             dispatcher=lambda fn, *args: self.root.after(0, fn, *args),
         )
 
@@ -439,6 +454,8 @@ class MainWindow:
         if not (self._doc_generator and self._doc_generator.is_stopped()):
             msg = f"生成完成！\n成功: {completed} 篇\n失败: {failed} 篇"
             messagebox.showinfo("完成", msg)
+
+        self._doc_generator = None
 
     def _open_output_dir(self):
         output_dir = self.output_dir_var.get().strip()

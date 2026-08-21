@@ -23,12 +23,14 @@ class APIClient:
         self.model = model
         self.timeout = timeout
         self._client = httpx.Client(timeout=httpx.Timeout(timeout))
+        self._closed = False
 
     def __del__(self):
-        try:
-            self._client.close()
-        except Exception:
-            pass
+        if not self._closed:
+            try:
+                self._client.close()
+            except Exception:
+                pass
 
     def _build_url(self, endpoint: str) -> str:
         return f"{self.base_url}/{endpoint.lstrip('/')}"
@@ -108,40 +110,28 @@ class APIClient:
         last_error = None
         for attempt in range(max_retries):
             try:
-                with self._client.stream("POST", url, json=payload, headers=self._headers()) as resp:
-                    if resp.status_code == 200:
-                        if stop_event and stop_event.is_set():
-                            raise APIError("用户停止生成", 0)
+                if stop_event and stop_event.is_set():
+                    raise APIError("用户停止生成", 0)
 
-                        if stop_event:
-                            def _abort_monitor():
-                                stop_event.wait()
-                                try:
-                                    resp.close()
-                                except Exception:
-                                    pass
-                            abort_thread = threading.Thread(target=_abort_monitor, daemon=True)
-                            abort_thread.start()
-
-                            body = resp.read()
-                            if stop_event and stop_event.is_set():
-                                raise APIError("用户停止生成", 0)
-
-                            data = json.loads(body)
-                            return data["choices"][0]["message"]["content"]
-                    elif resp.status_code == 429:
-                        wait = min(2**attempt, 30)
-                        print(f"速率限制 (429)，等待 {wait}s 后重试...")
-                        time.sleep(wait)
-                        continue
-                    elif resp.status_code in (500, 502, 503):
-                        wait = min(2**attempt, 15)
-                        print(f"服务器错误 ({resp.status_code})，等待 {wait}s 后重试...")
-                        time.sleep(wait)
-                        continue
-                    else:
-                        error_msg = f"API 错误 ({resp.status_code}): {resp.text[:500]}"
-                        raise APIError(error_msg, resp.status_code)
+                resp = self._client.post(url, json=payload, headers=self._headers())
+                if resp.status_code == 200:
+                    if stop_event and stop_event.is_set():
+                        raise APIError("用户停止生成", 0)
+                    data = resp.json()
+                    return data["choices"][0]["message"]["content"]
+                elif resp.status_code == 429:
+                    wait = min(2**attempt, 30)
+                    print(f"速率限制 (429)，等待 {wait}s 后重试...")
+                    time.sleep(wait)
+                    continue
+                elif resp.status_code in (500, 502, 503):
+                    wait = min(2**attempt, 15)
+                    print(f"服务器错误 ({resp.status_code})，等待 {wait}s 后重试...")
+                    time.sleep(wait)
+                    continue
+                else:
+                    error_msg = f"API 错误 ({resp.status_code}): {resp.text[:500]}"
+                    raise APIError(error_msg, resp.status_code)
             except APIError:
                 raise
             except httpx.TimeoutException:
@@ -159,6 +149,7 @@ class APIClient:
 
     def close(self):
         """关闭 HTTP 客户端"""
+        self._closed = True
         try:
             self._client.close()
         except Exception:
@@ -186,18 +177,24 @@ class APIClient:
         last_error = None
         for attempt in range(max_retries):
             try:
+                if stop_event and stop_event.is_set():
+                    return
+
                 with self._client.stream("POST", url, json=payload, headers=self._headers()) as resp:
                     if resp.status_code == 200:
                         if stop_event and stop_event.is_set():
                             return
 
                         if stop_event:
+                            done_event = threading.Event()
+
                             def _abort_monitor():
                                 stop_event.wait()
-                                try:
-                                    resp.close()
-                                except Exception:
-                                    pass
+                                if not done_event.is_set():
+                                    try:
+                                        resp.close()
+                                    except Exception:
+                                        pass
                             abort_thread = threading.Thread(target=_abort_monitor, daemon=True)
                             abort_thread.start()
 
@@ -219,6 +216,9 @@ class APIClient:
                                     content = delta.get("content", "")
                                     if content:
                                         yield content
+
+                        if stop_event:
+                            done_event.set()
                         return
                     elif resp.status_code == 429:
                         wait = min(2**attempt, 30)

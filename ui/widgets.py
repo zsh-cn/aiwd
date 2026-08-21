@@ -41,6 +41,8 @@ class EditableListbox(tk.Frame):
         self.listbox.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def _on_press(self, event):
+        if self.listbox.cget("state") == tk.DISABLED:
+            return
         if self._editing_index is not None:
             clicked_widget = event.widget
             if clicked_widget == self._edit_entry:
@@ -50,8 +52,8 @@ class EditableListbox(tk.Frame):
                 return
             self._finish_edit()
         else:
-            row = self.listbox.identify_row(event.y)
-            if row is None:
+            row = self.listbox.nearest(event.y)
+            if row is None or row >= len(self._items):
                 self.listbox.selection_clear(0, tk.END)
                 return
             bbox = self.listbox.bbox(row)
@@ -237,7 +239,14 @@ class EditableListbox(tk.Frame):
     def register_toolbar_button(self, button):
         self._toolbar_buttons.append(button)
 
-    def set_enabled(self, enabled: bool):
+    def set_enabled(self, enabled: bool, buttons_only: bool = False):
         state = tk.NORMAL if enabled else tk.DISABLED
         for btn in self._toolbar_buttons:
             btn.configure(state=state)
+        if not buttons_only:
+            if enabled:
+                self.listbox.configure(state=tk.NORMAL)
+            else:
+                if self._editing_index is not None:
+                    self._cancel_edit()
+                self.listbox.configure(state=tk.DISABLED)
