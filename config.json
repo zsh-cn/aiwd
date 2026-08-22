@@ -1,9 +1,12 @@
 {
   "base_url": "",
-  "api_key": "",
+  "api_key_encrypted": "",
   "model": "",
-  "topic": "",
+  "output_dir": "",
+  "theme": "",
+  "remark": "",
+  "count": 10,
   "word_count": 1000,
-  "file_count": 100,
-  "output_dir": ""
+  "ai_formatting": true,
+  "template_doc": ""
 }

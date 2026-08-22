@@ -62,7 +62,7 @@ class MainWindow:
     def _show_about(self):
         messagebox.showinfo(
             "关于",
-            "AI 文档批量生成工具 v2.1.1\n\n"
+            "AI 文档批量生成工具 v2.2.0\n\n"
             "基于 OpenAI 兼容 API 批量生成文档并转换为 Word 格式。",
         )
 

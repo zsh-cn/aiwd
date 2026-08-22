@@ -175,6 +175,11 @@ def _normalize_config(config: dict) -> dict:
                 "cell_margin_top": 0.1, "cell_margin_bottom": 0.1,
                 "cell_margin_left": 0.1, "cell_margin_right": 0.1,
                 "cell_shading": "",
+                "header_row": {
+                    "background_color": "#e8edf2",
+                    "font": "黑体", "size": 10, "color": "#1a202c",
+                    "bold": True,
+                },
             },
             "link": {
                 "font": "宋体", "size": 11, "color": "#3182ce",
@@ -365,9 +370,13 @@ def _analyze_structure(markdown: str) -> dict:
         "has_h5": False,
         "has_h6": False,
         "has_list": False,
+        "has_nested_list": False,
+        "has_ordered_list": False,
         "has_table": False,
+        "has_multi_table": False,
         "has_quote": False,
         "has_code": False,
+        "has_long_code": False,
         "has_inline_code": False,
         "has_bold": False,
         "has_image": False,
@@ -379,6 +388,11 @@ def _analyze_structure(markdown: str) -> dict:
         "has_task_list": False,
         "has_definition": False,
         "content_length": len(markdown),
+        "paragraph_count": 0,
+        "list_count": 0,
+        "table_count": 0,
+        "code_block_count": 0,
+        "avg_paragraph_length": 0,
     }
 
     if re.search(r'^#\s', markdown, re.MULTILINE):
@@ -394,14 +408,36 @@ def _analyze_structure(markdown: str) -> dict:
         structure["has_h5"] = True
     if re.search(r'^######\s', markdown, re.MULTILINE):
         structure["has_h6"] = True
-    if re.search(r'^[-*+]\s', markdown, re.MULTILINE):
+
+    list_items = re.findall(r'^[-*+]\s', markdown, re.MULTILINE)
+    if list_items:
         structure["has_list"] = True
-    if re.search(r'\|.*\|', markdown):
+        structure["list_count"] = len(list_items)
+        nested_list = re.search(r'^\s{2,}[-*+]\s', markdown, re.MULTILINE)
+        if nested_list:
+            structure["has_nested_list"] = True
+        ordered_list = re.search(r'^\d+\.\s', markdown, re.MULTILINE)
+        if ordered_list:
+            structure["has_ordered_list"] = True
+
+    tables = re.findall(r'\|.*\|', markdown)
+    if tables:
         structure["has_table"] = True
+        table_blocks = re.findall(r'(?:\|.*\|\n)+', markdown)
+        structure["table_count"] = len(table_blocks) if table_blocks else 1
+        if structure["table_count"] > 1:
+            structure["has_multi_table"] = True
+
     if re.search(r'^>\s', markdown, re.MULTILINE):
         structure["has_quote"] = True
-    if re.search(r'```[\s\S]*```', markdown):
+
+    code_blocks = re.findall(r'```[\s\S]*?```', markdown)
+    if code_blocks:
         structure["has_code"] = True
+        structure["code_block_count"] = len(code_blocks)
+        if any(len(block) > 400 for block in code_blocks):
+            structure["has_long_code"] = True
+
     if re.search(r'\*\*[^*]+\*\*', markdown):
         structure["has_bold"] = True
     if re.search(r'!\[.*\]\(.*\)', markdown):
@@ -422,6 +458,14 @@ def _analyze_structure(markdown: str) -> dict:
         structure["has_task_list"] = True
     if re.search(r'^:\s', markdown, re.MULTILINE):
         structure["has_definition"] = True
+
+    paragraphs = [p for p in re.split(r'\n\s*\n', markdown) if p.strip()]
+    structure["paragraph_count"] = len(paragraphs)
+    if paragraphs:
+        text_paragraphs = [re.sub(r'[#>*_`~\-|!\[\]()]+', '', p).strip() for p in paragraphs]
+        lengths = [len(p) for p in text_paragraphs if p]
+        if lengths:
+            structure["avg_paragraph_length"] = int(sum(lengths) / len(lengths))
 
     return structure
 
@@ -447,13 +491,25 @@ def _build_layout_prompt(
     if structure["has_h6"]:
         structure_desc.append("包含六级标题")
     if structure["has_list"]:
-        structure_desc.append("包含列表")
+        list_detail = "包含列表"
+        if structure.get("has_ordered_list"):
+            list_detail += "（含有序列表）"
+        if structure.get("has_nested_list"):
+            list_detail += "（含嵌套层级）"
+        list_detail += f"（约 {structure.get('list_count', 0)} 项）"
+        structure_desc.append(list_detail)
     if structure["has_table"]:
-        structure_desc.append("包含表格")
+        tbl_count = structure.get("table_count", 1)
+        structure_desc.append(f"包含表格（{tbl_count} 个）")
     if structure["has_quote"]:
         structure_desc.append("包含引用")
     if structure["has_code"]:
-        structure_desc.append("包含代码块")
+        code_detail = "包含代码块"
+        if structure.get("code_block_count", 0) > 1:
+            code_detail += f"（{structure['code_block_count']} 处）"
+        if structure.get("has_long_code"):
+            code_detail += "（含长代码段）"
+        structure_desc.append(code_detail)
     if structure["has_bold"]:
         structure_desc.append("包含加粗文本")
     if structure["has_italic"]:
@@ -477,12 +533,40 @@ def _build_layout_prompt(
 
     content_preview = markdown[:500] if len(markdown) > 500 else markdown
 
+    paragraph_count = structure.get("paragraph_count", 0)
+    avg_paragraph_length = structure.get("avg_paragraph_length", 0)
+
+    doc_type_hints = []
+    if structure.get("has_code") and structure.get("has_table"):
+        doc_type_hints.append("技术文档（含代码与表格）")
+    elif structure.get("has_code"):
+        doc_type_hints.append("技术文档（含代码）")
+    elif structure.get("has_table") and structure.get("has_list"):
+        doc_type_hints.append("报告类文档（含表格与列表）")
+    elif structure.get("has_table"):
+        doc_type_hints.append("数据报告（含表格）")
+    elif structure.get("has_definition"):
+        doc_type_hints.append("术语/概念说明文档")
+    elif structure.get("has_quote") and avg_paragraph_length > 200:
+        doc_type_hints.append("论述性文章")
+    elif structure.get("has_title") and paragraph_count > 8:
+        doc_type_hints.append("长篇文章/论文")
+    elif paragraph_count <= 5:
+        doc_type_hints.append("短文/简报")
+    else:
+        doc_type_hints.append("通用文档")
+
+    doc_type_text = "、".join(doc_type_hints) if doc_type_hints else "通用文档"
+
     prompt = f"""请为以下文档设计最合适的排版方案。
 
 文档标题: {title}
 主题: {theme}
 文档结构: {', '.join(structure_desc) if structure_desc else '结构简单'}
 内容长度: 约 {structure['content_length']} 字符
+段落数: {paragraph_count}
+平均段落长度: {avg_paragraph_length} 字
+推断文档类型: {doc_type_text}
 
 文档预览:
 ```markdown
@@ -491,18 +575,16 @@ def _build_layout_prompt(
 
 用户额外要求（同时适用于排版）: {remark_text}
 
-请根据文档的内容类型和结构特点，设计合适的排版方案。
-请考虑：
-1. 文档类型（报告/散文/技术文档/论文/简报等）
-2. 标题层级的视觉层次
-3. 正文字体大小和行距的可读性
-4. 颜色搭配的专业性和美观性
-5. 页边距与纸张大小的合理性
-6. 是否需要目录、章节编号、代码高亮等特殊功能
-7. 代码块是否需要独立样式和背景色
-8. 表格是否需要边框、行高、单元格间距
-9. 是否需要页眉页脚和页码
-10. 是否需要多栏布局
+请根据文档的内容类型和结构特点，设计合适的排版方案。请考虑：
+1. 标题层级：一级标题应醒目（18-22磅），次级标题逐级递减 1-2 磅，颜色层次分明
+2. 正文可读性：正文字号 10.5-12 磅，行距 1.3-1.8 倍，段落较长时用 1.75 倍行距
+3. 中文排版：中文正文建议宋体/思源宋体，英文和数字可搭配 Times New Roman，代码用 Consolas/Fira Code
+4. 页边距：标准 A4 文档 上下 2.54cm、左右 3.18cm；技术文档可适当加宽上下留白
+5. 长文档（>3000字）建议开启目录、章节编号；短文不需要
+6. 代码块：长代码建议使用浅灰色背景 + 等宽字体 + 左缩进；行内代码用稍浅背景区分
+7. 表格：数据表格需边框 + 合适行高（0.8-1.0cm），纯布局表格可去掉边框
+8. 页眉页脚：长文档建议添加页眉标题和页码；短文可省略
+9. 首行缩进：中文正文建议 2 字符缩进（约 22 磅），英文正文可省略
 
 请输出严格的 JSON 格式配置。以下是完整的属性列表（仅输出需要覆盖的属性，其他可省略）：
 
@@ -525,7 +607,7 @@ def _build_layout_prompt(
     "hr": {{"color": "#999999", "width": 1.0, "space_before": 12, "space_after": 12}},
     "task_list": {{"font": "宋体", "size": 11, "color": "#000000", "line_spacing": 1.4}},
     "definition": {{"term_font": "黑体", "term_size": 11, "term_color": "#1a202c", "term_bold": true, "definition_font": "宋体", "definition_size": 11, "definition_color": "#000000", "left_indent": 44}},
-    "table": {{"font": "宋体", "size": 10, "color": "#000000", "border": true, "border_color": "#000000", "border_width": 0.5, "row_height": 0.8, "cell_margin_top": 0.1, "cell_margin_bottom": 0.1, "cell_margin_left": 0.1, "cell_margin_right": 0.1, "cell_shading": ""}},
+    "table": {{"font": "宋体", "size": 10, "color": "#000000", "border": true, "border_color": "#000000", "border_width": 0.5, "row_height": 0.8, "cell_margin_top": 0.1, "cell_margin_bottom": 0.1, "cell_margin_left": 0.1, "cell_margin_right": 0.1, "cell_shading": "", "header_row": {{"background_color": "#e8edf2", "font": "黑体", "size": 10, "color": "#1a202c", "bold": true}}}},
     "link": {{"font": "宋体", "size": 11, "color": "#3182ce", "underline": true}},
     "image": {{"alignment": "center", "caption_font": "宋体", "caption_size": 9, "caption_color": "#666666"}},
     "header": {{"text": "", "font": "宋体", "size": 9, "color": "#666666", "alignment": "center"}},

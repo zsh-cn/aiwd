@@ -288,7 +288,6 @@ def _configure_default_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARA
 
     if body_config:
         _apply_para_config(style, body_config, Pt, WD_ALIGN_PARAGRAPH)
-    style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
 
 def _configure_title_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
@@ -319,7 +318,6 @@ def _configure_heading_styles(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PAR
         style = _get_or_create_style(doc, style_name, WD_STYLE_TYPE.PARAGRAPH)
         _apply_font_config(style, config, Pt, RGBColor, qn)
         _apply_para_config(style, config, Pt, WD_ALIGN_PARAGRAPH)
-        style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
 
 def _configure_body_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH):
@@ -330,7 +328,6 @@ def _configure_body_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRA
     style = doc.styles['Normal']
     _apply_font_config(style, body_config, Pt, RGBColor, qn)
     _apply_para_config(style, body_config, Pt, WD_ALIGN_PARAGRAPH)
-    style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
 
 def _configure_quote_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
@@ -341,7 +338,6 @@ def _configure_quote_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGR
     style = _get_or_create_style(doc, 'Quote', WD_STYLE_TYPE.PARAGRAPH)
     _apply_font_config(style, quote_config, Pt, RGBColor, qn)
     _apply_para_config(style, quote_config, Pt, WD_ALIGN_PARAGRAPH)
-    style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
 
 def _configure_list_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
@@ -353,7 +349,6 @@ def _configure_list_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRA
             style = _get_or_create_style(doc, style_name, WD_STYLE_TYPE.PARAGRAPH)
             _apply_font_config(style, base_list_config, Pt, RGBColor, qn)
             _apply_para_config(style, base_list_config, Pt, WD_ALIGN_PARAGRAPH)
-            style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
     if nested_config:
         for level in [2, 3]:
@@ -365,7 +360,6 @@ def _configure_list_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRA
                                                                    nested_config))
                 _apply_font_config(style, level_config, Pt, RGBColor, qn)
                 _apply_para_config(style, level_config, Pt, WD_ALIGN_PARAGRAPH)
-                style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
 
 def _configure_code_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE, OxmlElement):
@@ -420,7 +414,6 @@ def _configure_task_list_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PA
     style = _get_or_create_style(doc, 'List Bullet', WD_STYLE_TYPE.PARAGRAPH)
     _apply_font_config(style, task_config, Pt, RGBColor, qn)
     _apply_para_config(style, task_config, Pt, WD_ALIGN_PARAGRAPH)
-    style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
 
 def _configure_definition_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_PARAGRAPH, WD_STYLE_TYPE):
@@ -445,7 +438,6 @@ def _configure_definition_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_P
               bold=term_bold)
     term_style.paragraph_format.space_before = Pt(6)
     term_style.paragraph_format.space_after = Pt(3)
-    term_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
     def_style = _get_or_create_style(doc, 'Definition', WD_STYLE_TYPE.PARAGRAPH)
     _set_font(def_style, Pt, RGBColor, qn,
@@ -454,7 +446,6 @@ def _configure_definition_style(doc, styles_config, Pt, RGBColor, qn, WD_ALIGN_P
     def_style.paragraph_format.left_indent = Pt(left_indent)
     def_style.paragraph_format.space_before = Pt(3)
     def_style.paragraph_format.space_after = Pt(3)
-    def_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
 
 def _configure_table_style(doc, styles_config, Pt, Cm, RGBColor, qn, WD_STYLE_TYPE, OxmlElement):
@@ -490,6 +481,10 @@ def _configure_table_style(doc, styles_config, Pt, Cm, RGBColor, qn, WD_STYLE_TY
     cell_shading = table_config.get("cell_shading")
     if cell_shading:
         _set_style_shading(style, cell_shading, qn, OxmlElement)
+
+    header_row = table_config.get("header_row", {})
+    if header_row:
+        _set_table_header_row(style, header_row, Pt, RGBColor, qn, OxmlElement)
 
 
 def _configure_link_style(doc, styles_config, Pt, RGBColor, qn, WD_STYLE_TYPE):
@@ -805,6 +800,33 @@ def _set_style_shading(style, color: str, qn, OxmlElement):
         pass
 
 
+def _set_table_cell_shading(style, color: str, qn, OxmlElement):
+    try:
+        tbl = style.element
+        tblPr = tbl.find(qn('w:tblPr'))
+        if tblPr is None:
+            tblPr = OxmlElement('w:tblPr')
+            tbl.insert(0, tblPr)
+
+        for existing in tblPr.findall(qn('w:tblCellSpacing')):
+            tblPr.remove(existing)
+
+        shd = OxmlElement('w:shd')
+        shd.set(qn('w:val'), 'clear')
+        shd.set(qn('w:color'), 'auto')
+        shd.set(qn('w:fill'), color.lstrip('#'))
+
+        try:
+            from lxml import etree
+            condFormatting = etree.SubElement(tblPr, qn('w:tblCondFmt'))
+            condFormatting.set(qn('w:type'), 'wholeTable')
+            condFormatting.append(shd)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
 def _set_paragraph_bottom_border(style, color: str, width_pt: float, qn, OxmlElement):
     try:
         pPr = style.element.get_or_add_pPr()
@@ -819,5 +841,42 @@ def _set_paragraph_bottom_border(style, color: str, width_pt: float, qn, OxmlEle
         bottom.set(qn('w:color'), color.lstrip('#'))
         pBdr.append(bottom)
         pPr.append(pBdr)
+    except Exception:
+        pass
+
+
+def _set_table_header_row(style, header_config: dict, Pt, RGBColor, qn, OxmlElement):
+    try:
+        tbl = style.element
+        tblPr = tbl.find(qn('w:tblPr'))
+        if tblPr is None:
+            tblPr = OxmlElement('w:tblPr')
+            tbl.insert(0, tblPr)
+
+        tblLook = OxmlElement('w:tblLook')
+        tblLook.set(qn('w:val'), '04A0')
+        tblLook.set(qn('w:firstRow'), '1')
+        tblLook.set(qn('w:lastRow'), '0')
+        tblLook.set(qn('w:firstColumn'), '0')
+        tblLook.set(qn('w:lastColumn'), '0')
+        tblLook.set(qn('w:noHBand'), '0')
+        tblLook.set(qn('w:noVBand'), '1')
+        for existing in tblPr.findall(qn('w:tblLook')):
+            tblPr.remove(existing)
+        tblPr.append(tblLook)
+
+        header_bg = header_config.get("background_color")
+        if header_bg:
+            try:
+                from lxml import etree
+                ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+                condFormatting = etree.SubElement(tblPr, qn('w:tblCondFmt'))
+                condFormatting.set(qn('w:type'), 'firstRow')
+                shd = etree.SubElement(condFormatting, qn('w:shd'))
+                shd.set(qn('w:val'), 'clear')
+                shd.set(qn('w:color'), 'auto')
+                shd.set(qn('w:fill'), header_bg.lstrip('#'))
+            except Exception:
+                pass
     except Exception:
         pass
